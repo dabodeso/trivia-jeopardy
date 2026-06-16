@@ -152,6 +152,43 @@ def reset_round(state):
     })
 
 
+def reset_full_game():
+    """Nueva partida: sin jugadores, puntos a 0, tablero desde questions.json."""
+    save_state(default_state())
+
+
+def _presenter_reset_section():
+    """Botón de reinicio con confirmación (desconecta jugadores y resetea puntos)."""
+    if "confirm_full_reset" not in st.session_state:
+        st.session_state.confirm_full_reset = False
+
+    st.markdown("---")
+    if not st.session_state.confirm_full_reset:
+        if st.button("🔄  Reiniciar juego", use_container_width=True):
+            st.session_state.confirm_full_reset = True
+            st.rerun()
+    else:
+        st.markdown(
+            '<div class="status-box" style="border-color:#ef5350;">'
+            '<div style="color:#ef5350;font-weight:800;font-size:1.1em;">'
+            '⚠️ ¿Reiniciar el juego?</div>'
+            '<div style="color:#ffcdd2;margin-top:10px;font-size:0.95em;">'
+            'Se desconectarán todos los concursantes, los puntos volverán a 0 '
+            'y el tablero se restaurará desde questions.json.</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅  Sí, reiniciar", use_container_width=True):
+                reset_full_game()
+                st.session_state.confirm_full_reset = False
+                st.rerun()
+        with c2:
+            if st.button("Cancelar", use_container_width=True):
+                st.session_state.confirm_full_reset = False
+                st.rerun()
+
 # ──────────────────────────────────────────────────────────────────────────────
 # CSS global
 # ──────────────────────────────────────────────────────────────────────────────
@@ -520,24 +557,6 @@ def screen_presenter():
     # ── Fase: tablero ──
     if phase == "board":
         _presenter_board(state)
-        st.markdown("---")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button(
-                "🔄 Reiniciar tablero (mantener jugadores y puntos)",
-                use_container_width=True,
-            ):
-                ns = default_state()
-                ns["players"] = state["players"]
-                save_state(ns)
-                st.rerun()
-        with c2:
-            if st.button(
-                "🗑️ Reiniciar todo (nueva partida desde cero)",
-                use_container_width=True,
-            ):
-                save_state(default_state())
-                st.rerun()
 
     # ── Fase: pregunta activa ──
     elif phase == "question_active":
@@ -654,6 +673,8 @@ def screen_presenter():
                 save_state(s)
                 st.rerun()
 
+    _presenter_reset_section()
+
 
 def _presenter_board(state):
     """Tablero interactivo para que el presentador seleccione preguntas."""
@@ -704,8 +725,20 @@ def screen_contestant(pid):
     player = find_player(state, pid)
 
     if not player:
-        st.error("No se encontró tu perfil. Vuelve al inicio y regístrate de nuevo.")
-        if st.button("← Inicio"):
+        st.markdown(
+            """
+            <div style="text-align:center;padding:40px 20px;">
+                <div style="font-size:1.5em;color:#ef5350;font-weight:700;">
+                    Sesión finalizada
+                </div>
+                <div style="color:#90caf9;margin-top:12px;font-size:1em;">
+                    El presentador ha reiniciado el juego o tu sesión expiró.
+                    Vuelve al inicio para unirte de nuevo.
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+        if st.button("← Volver al inicio", use_container_width=True):
             st.query_params.clear()
             st.rerun()
         return

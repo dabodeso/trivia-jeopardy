@@ -22,6 +22,7 @@ from streamlit_autorefresh import st_autorefresh
 # Constantes
 # ──────────────────────────────────────────────────────────────────────────────
 STATE_FILE = "game_state.json"
+LOCK_FILE = STATE_FILE + ".lock"
 QUESTIONS_FILE = "questions.json"
 PRESENTER_PASSWORD = "654321"
 GAME_TITLE = "TRIVIA EMPRENDIMIENTO"
@@ -128,6 +129,69 @@ def save_state(state):
         json.dump(state, f, ensure_ascii=False, indent=2)
     os.replace(tmp, STATE_FILE)
 
+
+def _acquire_state_lock(max_wait=1.0):
+    """Bloqueo por archivo para evitar dos pulsaciones simultáneas."""
+    deadline = time.time() + max_wait
+    while time.time() < deadline:
+        try:
+            fd = os.open(LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+            return True
+        except FileExistsError:
+            time.sleep(0.025)
+        except OSError:
+            time.sleep(0.025)
+    return False
+
+
+def _release_state_lock():
+    try:
+        os.remove(LOCK_FILE)
+    except OSError:
+        pass
+
+
+def read_state_file():
+    """Lee game_state.json sin modificarlo."""
+    if not os.path.exists(STATE_FILE):
+        return None
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def try_claim_buzz(pid):
+    """
+    Intenta registrar la pulsación de un concursante.
+    Solo el primero gana; el resto queda bloqueado hasta rebote o siguiente.
+    Devuelve: 'won' | 'blocked' | 'inactive'
+    """
+    if not _acquire_state_lock():
+        return "inactive"
+
+    try:
+        state = read_state_file()
+        if state is None:
+            return "inactive"
+
+        if state.get("game_phase") != "question_active":
+            return "inactive"
+        if not state.get("buzzers_active"):
+            if state.get("buzzed_player_id"):
+                return "blocked"
+            return "inactive"
+        if pid in state.get("failed_players", []):
+            return "inactive"
+        if state.get("buzzed_player_id") is not None:
+            return "blocked"
+
+        state["buzzed_player_id"] = pid
+        state["game_phase"] = "buzzed"
+        state["buzzers_active"] = False
+        save_state(state)
+        return "won"
+    finally:
+        _release_state_lock()
 
 def find_player(state, pid):
     for p in state["players"]:
@@ -766,18 +830,37 @@ def screen_contestant(pid):
 
     # ── Fase pregunta activa ──
     elif phase == "question_active":
-        failed        = state.get("failed_players", [])
+        failed = state.get("failed_players", [])
         buzzers_active = state.get("buzzers_active", False)
+        buzzed_id = state.get("buzzed_player_id")
 
         if pid in failed:
-            # Este jugador ya falló en esta ronda
             st.markdown(
                 f"""
                 <div style="text-align:center;padding:50px 20px;">
                     <div style="font-size:1.5em;color:#ef5350;font-weight:700;">
                         Ya respondiste esta ronda ❌
                     </div>
+                    <div style="color:#90caf9;margin-top:10px;font-size:0.95em;">
+                        Pulsador bloqueado hasta la siguiente pregunta.
+                    </div>
                     <div class="label-sm" style="margin-top:24px;">TUS PUNTOS</div>
+                    <div class="big-score">{pts}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+        elif buzzed_id and buzzed_id != pid:
+            bname = player_name(state, buzzed_id)
+            st.markdown(
+                f"""
+                <div style="text-align:center;padding:50px 20px;">
+                    <div style="font-size:1.5em;color:#42a5f5;font-weight:700;">
+                        🔔 <strong>{bname}</strong> ha pulsado
+                    </div>
+                    <div style="color:#78909c;margin-top:12px;font-size:0.95em;">
+                        Pulsador bloqueado. Esperando al presentador...
+                    </div>
+                    <div class="label-sm" style="margin-top:28px;">TUS PUNTOS</div>
                     <div class="big-score">{pts}</div>
                 </div>""",
                 unsafe_allow_html=True,
@@ -809,24 +892,23 @@ def screen_contestant(pid):
                 unsafe_allow_html=True,
             )
             if st.button("🔔  PULSA  🔔", use_container_width=True, key="buzz_btn"):
-                # Recargar estado justo antes de escribir (reducir race conditions)
-                s = load_state()
-                if (
-                    s["game_phase"] == "question_active"
-                    and s.get("buzzers_active")
-                    and pid not in s.get("failed_players", [])
-                    and s.get("buzzed_player_id") is None
-                ):
-                    s["buzzed_player_id"] = pid
-                    s["game_phase"] = "buzzed"
-                    s["buzzers_active"] = False
-                    save_state(s)
+                result = try_claim_buzz(pid)
+                if result == "won":
+                    st.toast("¡Has pulsado!", icon="🔔")
+                elif result == "blocked":
+                    st.toast("Otro concursante pulsó antes", icon="⛔")
                 st.rerun()
         else:
             st.markdown(
                 f"""
                 <div style="text-align:center;padding:50px 20px;">
-                    <div style="font-size:1.2em;color:#42a5f5;">Preparando...</div>
+                    <div style="font-size:1.2em;color:#78909c;">
+                        Pulsador cerrado
+                    </div>
+                    <div style="color:#546e7a;margin-top:8px;font-size:0.9em;">
+                        Esperando al presentador...
+                    </div>
+                    <div class="label-sm" style="margin-top:28px;">TUS PUNTOS</div>
                     <div class="big-score">{pts}</div>
                 </div>""",
                 unsafe_allow_html=True,
@@ -859,7 +941,7 @@ def screen_contestant(pid):
                         🔔 <strong>{bname}</strong> ha pulsado
                     </div>
                     <div style="color:#546e7a;margin-top:10px;font-size:0.9em;">
-                        Esperando resolución...
+                        Pulsador bloqueado. Esperando resolución...
                     </div>
                     <div class="label-sm" style="margin-top:28px;">TUS PUNTOS</div>
                     <div class="big-score">{pts}</div>

@@ -12,8 +12,8 @@
     {
       "name": "Entrevistas",
       "questions": [
-        { "text": "Dijo: 'Si no eres rico, eres tonto'", "points": 100 },
-        { "text": "Fueron la primera entrevista", "points": 200 },
+        { "text": "Fueron la primera entrevista", "points": 100 },
+        { "text": "Dijo: 'Si no eres rico, es porque eres tonto'", "points": 200 },
         { "text": "Total de entrevistas que hemos hecho", "points": 300 },
         { "text": "Llegó media hora tarde a una entrevista en bankinter y le dió verguenza entrar", "points": 400 }
       ]
@@ -32,7 +32,7 @@
       "questions": [
         { "text": "Esta familia controla la empresa", "points": 100 },
         { "text": "Explica por que se llama Renta 4", "points": 200 },
-        { "text": "Tiene presencia en 3 paises de latam, nombra 1", "points": 300 },
+        { "text": "Así se llama el asistente de IA que Dani, Victor y Pablo han creado para renta 4", "points": 300 },
         { "text": "Este fue su beneficio neto en 2025", "points": 400 }
       ]
     }

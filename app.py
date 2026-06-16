@@ -1,12 +1,13 @@
 """
-Trivia Jeopardy - Aplicación multidispositivo en tiempo real.
+Trivia Emprendimiento (Jeopardy) - Aplicación multidispositivo en tiempo real.
 
 Roles:
   - Pantalla Principal (?role=display)  → tablero proyectado
   - Presentador       (?role=presenter) → controla el juego (contraseña 654321)
   - Concursante       (?role=contestant&pid=<id>) → pulsador
 
-Estado compartido en game_state.json (actualizaciones atómicas).
+Preguntas y categorías: edita questions.json
+Estado del juego en curso: game_state.json (se genera automáticamente)
 """
 
 import json
@@ -21,10 +22,59 @@ from streamlit_autorefresh import st_autorefresh
 # Constantes
 # ──────────────────────────────────────────────────────────────────────────────
 STATE_FILE = "game_state.json"
+QUESTIONS_FILE = "questions.json"
 PRESENTER_PASSWORD = "654321"
+GAME_TITLE = "TRIVIA EMPRENDIMIENTO"
+GAME_SUBTITLE = "Trivia Jeopardy"
 NUM_CATEGORIES = 4
-QUESTIONS_PER_CATEGORY = 5
-POINT_VALUES = [100, 200, 300, 400, 500]
+QUESTIONS_PER_CATEGORY = 4
+POINT_VALUES = [100, 200, 300, 400]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Preguntas (questions.json)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def load_questions_config():
+    """Lee categorías y preguntas desde questions.json."""
+    if not os.path.exists(QUESTIONS_FILE):
+        raise FileNotFoundError(
+            f"No se encontró {QUESTIONS_FILE}. "
+            "Crea el archivo con tus categorías y preguntas."
+        )
+    with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    categories = data.get("categories", [])
+    if len(categories) != NUM_CATEGORIES:
+        raise ValueError(
+            f"{QUESTIONS_FILE} debe tener {NUM_CATEGORIES} categorías "
+            f"(tiene {len(categories)})."
+        )
+    for i, cat in enumerate(categories):
+        qs = cat.get("questions", [])
+        if len(qs) != QUESTIONS_PER_CATEGORY:
+            raise ValueError(
+                f"Categoría «{cat.get('name', i)}»: se esperan "
+                f"{QUESTIONS_PER_CATEGORY} preguntas (tiene {len(qs)})."
+            )
+    return categories
+
+
+def build_categories_from_config():
+    """Convierte questions.json al formato interno del juego."""
+    categories = []
+    for i, cat in enumerate(load_questions_config()):
+        questions = []
+        for j, q in enumerate(cat["questions"]):
+            points = q.get("points", POINT_VALUES[j])
+            questions.append({
+                "id": f"c{i}q{j}",
+                "text": q["text"],
+                "points": points,
+                "answered": False,
+            })
+        categories.append({"name": cat["name"], "questions": questions})
+    return categories
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Gestión del estado compartido
@@ -33,21 +83,7 @@ POINT_VALUES = [100, 200, 300, 400, 500]
 def default_state():
     return {
         "players": [],
-        "categories": [
-            {
-                "name": f"Categoría {i + 1}",
-                "questions": [
-                    {
-                        "id": f"c{i}q{j}",
-                        "text": f"Pregunta {j + 1} de la Categoría {i + 1}",
-                        "points": POINT_VALUES[j],
-                        "answered": False,
-                    }
-                    for j in range(QUESTIONS_PER_CATEGORY)
-                ],
-            }
-            for i in range(NUM_CATEGORIES)
-        ],
+        "categories": build_categories_from_config(),
         # board | question_active | buzzed
         "game_phase": "board",
         "current_question": None,   # {"cat": int, "q": int}
@@ -62,7 +98,21 @@ def load_state():
     try:
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                state = json.load(f)
+            cats = state.get("categories", [])
+            if (
+                len(cats) != NUM_CATEGORIES
+                or any(
+                    len(c.get("questions", [])) != QUESTIONS_PER_CATEGORY
+                    for c in cats
+                )
+            ):
+                # Tablero desactualizado → regenerar preguntas desde questions.json
+                new = default_state()
+                new["players"] = state.get("players", [])
+                save_state(new)
+                return new
+            return state
     except Exception:
         pass
     s = default_state()
@@ -289,11 +339,13 @@ def board_html(state):
 
 # ── Lobby ─────────────────────────────────────────────────────────────────────
 def screen_lobby():
-    st.markdown('<div class="game-title">🎯 TRIVIA JEOPARDY</div>',
-                unsafe_allow_html=True)
     st.markdown(
-        '<p style="text-align:center;color:#90caf9;font-size:1.1em;">'
-        'Selecciona tu rol para unirte al concurso</p>',
+        f'<div class="game-title">🎯 {GAME_TITLE}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<p style="text-align:center;color:#90caf9;font-size:1.1em;">'
+        f'{GAME_SUBTITLE} · Selecciona tu rol para unirte al concurso</p>',
         unsafe_allow_html=True,
     )
     st.markdown("<br>", unsafe_allow_html=True)
@@ -788,7 +840,7 @@ def screen_contestant(pid):
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
     st.set_page_config(
-        page_title="Trivia Jeopardy",
+        page_title="Trivia Emprendimiento",
         page_icon="🎯",
         layout="wide",
         initial_sidebar_state="collapsed",

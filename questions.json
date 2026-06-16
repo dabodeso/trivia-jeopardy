@@ -1,0 +1,40 @@
+{
+  "categories": [
+    {
+      "name": "Nosotros",
+      "questions": [
+        { "text": "Fue descrito como mujeriego en la primea clase", "points": 100 },
+        { "text": "Fue el primer alunmo en irse del hogar vasco", "points": 200 },
+        { "text": "Correcto", "points": 300 },
+        { "text": "Va a sacar una matricula en esta clase", "points": 400 }
+      ]
+    },
+    {
+      "name": "Entrevistas",
+      "questions": [
+        { "text": "Dijo: 'Si no eres rico, eres tonto'", "points": 100 },
+        { "text": "Fueron la primera entrevista", "points": 200 },
+        { "text": "Total de entrevistas que hemos hecho", "points": 300 },
+        { "text": "Llegó media hora tarde a una entrevista en bankinter y le dió verguenza entrar", "points": 400 }
+      ]
+    },
+    {
+      "name": "Cosas de clase",
+      "questions": [
+        { "text": "Este equipo hizo la torre de espaguetis mas alta", "points": 100 },
+        { "text": "Nombra 1 canción que haya sonado antes de clase", "points": 200 },
+        { "text": "Nombra a alguien al que Juan Pablo regañase en el hogar vasco", "points": 300 },
+        { "text": "Nuestro primer proyecto fue usar el design thinking para mejorar esta ciudad española", "points": 400 }
+      ]
+    },
+    {
+      "name": "Renta 4",
+      "questions": [
+        { "text": "Esta familia controla la empresa", "points": 100 },
+        { "text": "Explica por que se llama Renta 4", "points": 200 },
+        { "text": "Tiene presencia en 3 paises de latam, nombra 1", "points": 300 },
+        { "text": "Este fue su beneficio neto en 2025", "points": 400 }
+      ]
+    }
+  ]
+}

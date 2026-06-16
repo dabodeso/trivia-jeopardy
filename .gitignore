@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pyo
+game_state.json
+game_state.json.tmp
+.env
